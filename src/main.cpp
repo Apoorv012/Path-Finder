@@ -111,6 +111,16 @@ int main()
     addEdgeText.setFillColor(sf::Color::White);
     addEdgeText.setPosition(sf::Vector2f(20, 215));
 
+    // Remove Edge button
+    sf::RectangleShape removeEdgeButton(sf::Vector2f(150, 40));
+    removeEdgeButton.setPosition(sf::Vector2f(10, 255));
+    removeEdgeButton.setFillColor(sf::Color(200, 120, 40));
+    removeEdgeButton.setOutlineThickness(2);
+    removeEdgeButton.setOutlineColor(sf::Color::White);
+    sf::Text removeEdgeText(font, "Remove Edge", 18);
+    removeEdgeText.setFillColor(sf::Color::White);
+    removeEdgeText.setPosition(sf::Vector2f(20, 265));
+
     // Mode message text
     sf::Text modeText(font, "", 26);
     modeText.setFillColor(sf::Color::White);
@@ -133,6 +143,16 @@ int main()
     int hoveredNodeType = -1; // 0: destination, 1: road
     int hoveredNodeIndex = -1;
 
+    // Edge selection state
+    bool isAddEdgeMode = false;
+    int selectedNodeType = -1; // 0: destination, 1: road
+    int selectedNodeIndex = -1;
+
+    // Remove Edge state
+    bool isRemoveEdgeMode = false;
+    int removeEdgeNodeType = -1;
+    int removeEdgeNodeIndex = -1;
+
     // Load nodes from file
     {
         std::ifstream inFile("nodes.json");
@@ -147,6 +167,11 @@ int main()
             if (j.contains("roads")) {
                 for (const auto& node : j["roads"]) {
                     roadNodes.push_back(Node{sf::Vector2f(node[0], node[1]), false});
+                }
+            }
+            if (j.contains("edges")) {
+                for (const auto& edge : j["edges"]) {
+                    edges.push_back(Edge{sf::Vector2f(edge[0][0], edge[0][1]), sf::Vector2f(edge[1][0], edge[1][1])});
                 }
             }
         }
@@ -198,7 +223,12 @@ int main()
                         sf::CircleShape nodeShape(5);
                         nodeShape.setPosition(it->position);
                         if (nodeShape.getGlobalBounds().contains(window.mapPixelToCoords(mousePos))) {
+                            sf::Vector2f removedPos = it->position;
                             destinationNodes.erase(it);
+                            // Remove all edges connected to this node
+                            edges.erase(std::remove_if(edges.begin(), edges.end(), [&](const Edge& e) {
+                                return e.from == removedPos || e.to == removedPos;
+                            }), edges.end());
                             isRemoveMode = false;
                             break;
                         }
@@ -209,7 +239,12 @@ int main()
                         sf::CircleShape nodeShape(5);
                         nodeShape.setPosition(it->position);
                         if (nodeShape.getGlobalBounds().contains(window.mapPixelToCoords(mousePos))) {
+                            sf::Vector2f removedPos = it->position;
                             roadNodes.erase(it);
+                            // Remove all edges connected to this node
+                            edges.erase(std::remove_if(edges.begin(), edges.end(), [&](const Edge& e) {
+                                return e.from == removedPos || e.to == removedPos;
+                            }), edges.end());
                             isRemoveMode = false;
                             break;
                         }
@@ -238,37 +273,76 @@ int main()
                 // Check if add edge button was clicked
                 else if (addEdgeButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
                 {
-                    edges.clear();
-                    // Connect each destination to its nearest road
-                    for (const auto& dest : destinationNodes) {
-                        float minDist = std::numeric_limits<float>::max();
-                        sf::Vector2f nearestRoad;
-                        for (const auto& road : roadNodes) {
-                            float dist = std::hypot(dest.position.x - road.position.x, dest.position.y - road.position.y);
-                            if (dist < minDist) {
-                                minDist = dist;
-                                nearestRoad = road.position;
-                            }
-                        }
-                        if (minDist < std::numeric_limits<float>::max()) {
-                            edges.push_back({dest.position, nearestRoad});
-                        }
+                    isAddEdgeMode = !isAddEdgeMode;
+                    selectedNodeType = -1;
+                    selectedNodeIndex = -1;
+                    isRemoveMode = false;
+                    showTypeButtons = false;
+                }
+                // Check if remove edge button was clicked
+                else if (removeEdgeButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
+                {
+                    isRemoveEdgeMode = !isRemoveEdgeMode;
+                    removeEdgeNodeType = -1;
+                    removeEdgeNodeIndex = -1;
+                    isAddEdgeMode = false;
+                    isRemoveMode = false;
+                    showTypeButtons = false;
+                }
+                // Manual edge adding mode
+                else if (isAddEdgeMode && (hoveredNodeType != -1 && hoveredNodeIndex != -1))
+                {
+                    if (selectedNodeType == -1) {
+                        // First node selected
+                        selectedNodeType = hoveredNodeType;
+                        selectedNodeIndex = hoveredNodeIndex;
+                    } else {
+                        // Second node selected, create edge
+                        sf::Vector2f from, to;
+                        if (selectedNodeType == 0)
+                            from = destinationNodes[selectedNodeIndex].position;
+                        else
+                            from = roadNodes[selectedNodeIndex].position;
+                        if (hoveredNodeType == 0)
+                            to = destinationNodes[hoveredNodeIndex].position;
+                        else
+                            to = roadNodes[hoveredNodeIndex].position;
+                        edges.push_back({from, to});
+                        // Reset selection for next edge
+                        selectedNodeType = -1;
+                        selectedNodeIndex = -1;
+                        isAddEdgeMode = false;
                     }
-                    // Connect each road to its nearest road (excluding itself)
-                    for (size_t i = 0; i < roadNodes.size(); ++i) {
-                        float minDist = std::numeric_limits<float>::max();
-                        sf::Vector2f nearestRoad;
-                        for (size_t j = 0; j < roadNodes.size(); ++j) {
-                            if (i == j) continue;
-                            float dist = std::hypot(roadNodes[i].position.x - roadNodes[j].position.x, roadNodes[i].position.y - roadNodes[j].position.y);
-                            if (dist < minDist) {
-                                minDist = dist;
-                                nearestRoad = roadNodes[j].position;
+                }
+                // Manual edge removal mode
+                else if (isRemoveEdgeMode && (hoveredNodeType != -1 && hoveredNodeIndex != -1))
+                {
+                    if (removeEdgeNodeType == -1) {
+                        // First node selected
+                        removeEdgeNodeType = hoveredNodeType;
+                        removeEdgeNodeIndex = hoveredNodeIndex;
+                    } else {
+                        // Second node selected, try to remove edge
+                        sf::Vector2f from, to;
+                        if (removeEdgeNodeType == 0)
+                            from = destinationNodes[removeEdgeNodeIndex].position;
+                        else
+                            from = roadNodes[removeEdgeNodeIndex].position;
+                        if (hoveredNodeType == 0)
+                            to = destinationNodes[hoveredNodeIndex].position;
+                        else
+                            to = roadNodes[hoveredNodeIndex].position;
+                        // Remove edge if it exists (in either direction)
+                        for (auto it = edges.begin(); it != edges.end(); ++it) {
+                            if ((it->from == from && it->to == to) || (it->from == to && it->to == from)) {
+                                edges.erase(it);
+                                break;
                             }
                         }
-                        if (minDist < std::numeric_limits<float>::max()) {
-                            edges.push_back({roadNodes[i].position, nearestRoad});
-                        }
+                        // Reset selection for next removal
+                        removeEdgeNodeType = -1;
+                        removeEdgeNodeIndex = -1;
+                        isRemoveEdgeMode = false;
                     }
                 }
             }
@@ -347,6 +421,27 @@ int main()
             window.draw(thickLine);
         }
 
+        // Draw selection highlight for manual edge
+        if (isAddEdgeMode && selectedNodeType != -1 && selectedNodeIndex != -1) {
+            sf::Vector2f pos = (selectedNodeType == 0) ? destinationNodes[selectedNodeIndex].position : roadNodes[selectedNodeIndex].position;
+            sf::CircleShape selShape(10);
+            selShape.setPosition(pos - sf::Vector2f(5, 5));
+            selShape.setFillColor(sf::Color::Transparent);
+            selShape.setOutlineColor(sf::Color::Green);
+            selShape.setOutlineThickness(3);
+            window.draw(selShape);
+        }
+        // Draw selection highlight for manual edge removal
+        if (isRemoveEdgeMode && removeEdgeNodeType != -1 && removeEdgeNodeIndex != -1) {
+            sf::Vector2f pos = (removeEdgeNodeType == 0) ? destinationNodes[removeEdgeNodeIndex].position : roadNodes[removeEdgeNodeIndex].position;
+            sf::CircleShape selShape(10);
+            selShape.setPosition(pos - sf::Vector2f(5, 5));
+            selShape.setFillColor(sf::Color::Transparent);
+            selShape.setOutlineColor(sf::Color::Magenta);
+            selShape.setOutlineThickness(3);
+            window.draw(selShape);
+        }
+
         // Draw button and text
         window.draw(button);
         window.draw(buttonText);
@@ -358,10 +453,22 @@ int main()
         }
         window.draw(removeButton);
         window.draw(removeText);
+        window.draw(removeEdgeButton);
+        window.draw(removeEdgeText);
 
         // Set and draw mode message
         if (isRemoveMode) {
             modeText.setString("Remove node");
+        } else if (isRemoveEdgeMode) {
+            if (removeEdgeNodeType == -1)
+                modeText.setString("Select first node (remove edge)");
+            else
+                modeText.setString("Select second node (remove edge)");
+        } else if (isAddEdgeMode) {
+            if (selectedNodeType == -1)
+                modeText.setString("Select first node");
+            else
+                modeText.setString("Select second node");
         } else if (isAddingNode) {
             if (isDestinationNode) {
                 modeText.setString("Add destination");
@@ -391,6 +498,10 @@ int main()
         j["roads"] = nlohmann::json::array();
         for (const auto& node : roadNodes) {
             j["roads"].push_back({node.position.x, node.position.y});
+        }
+        j["edges"] = nlohmann::json::array();
+        for (const auto& edge : edges) {
+            j["edges"].push_back({{edge.from.x, edge.from.y}, {edge.to.x, edge.to.y}});
         }
         std::ofstream outFile("nodes.json");
         outFile << j.dump(4);
