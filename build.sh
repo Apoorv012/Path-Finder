@@ -9,8 +9,9 @@ mkdir -p build
 # Navigate to build directory
 cd build
 
-# Run cmake and make
-cmake .. && make
+# Run cmake (if needed) and make
+# cmake ..
+make
 
 # Run the executable
 ./bin/main

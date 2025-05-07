@@ -65,7 +65,7 @@ int main()
     mapSprite.setScale(sf::Vector2f(scale, scale));
 
     // Create button
-    sf::RectangleShape button(sf::Vector2f(150, 40));
+    sf::RectangleShape button(sf::Vector2f(175, 40));
     button.setPosition(sf::Vector2f(10, 10));
     button.setFillColor(sf::Color(100, 100, 100));
     button.setOutlineThickness(2);
@@ -76,56 +76,56 @@ int main()
     if (!font.openFromFile("OpenSans-Regular.ttf")) {
         return -1; // Exit if font loading fails
     }
-    sf::Text buttonText(font, "Add Node", 20);
+    sf::Text buttonText(font, "Add Node (A)", 20);
     buttonText.setFillColor(sf::Color::White);
     buttonText.setPosition(sf::Vector2f(20, 15));
 
     // Node type selection buttons (hidden by default)
-    sf::RectangleShape destButton(sf::Vector2f(130, 35));
+    sf::RectangleShape destButton(sf::Vector2f(155, 35));
     destButton.setPosition(sf::Vector2f(20, 60));
     destButton.setFillColor(sf::Color(200, 80, 80));
     destButton.setOutlineThickness(2);
     destButton.setOutlineColor(sf::Color::White);
-    sf::Text destText(font, "Destination", 18);
+    sf::Text destText(font, "Destination (D)", 18);
     destText.setFillColor(sf::Color::White);
     destText.setPosition(sf::Vector2f(30, 65));
 
-    sf::RectangleShape roadButton(sf::Vector2f(130, 35));
+    sf::RectangleShape roadButton(sf::Vector2f(155, 35));
     roadButton.setPosition(sf::Vector2f(20, 105));
     roadButton.setFillColor(sf::Color(80, 80, 200));
     roadButton.setOutlineThickness(2);
     roadButton.setOutlineColor(sf::Color::White);
-    sf::Text roadText(font, "Road", 18);
+    sf::Text roadText(font, "Road (F)", 18);
     roadText.setFillColor(sf::Color::White);
     roadText.setPosition(sf::Vector2f(30, 110));
 
     // Remove Node button
-    sf::RectangleShape removeButton(sf::Vector2f(150, 40));
+    sf::RectangleShape removeButton(sf::Vector2f(175, 40));
     removeButton.setPosition(sf::Vector2f(10, 155));
     removeButton.setFillColor(sf::Color(120, 40, 40));
     removeButton.setOutlineThickness(2);
     removeButton.setOutlineColor(sf::Color::White);
-    sf::Text removeText(font, "Remove Node", 18);
+    sf::Text removeText(font, "Remove Node (R)", 18);
     removeText.setFillColor(sf::Color::White);
     removeText.setPosition(sf::Vector2f(20, 165));
 
     // Add Edge button
-    sf::RectangleShape addEdgeButton(sf::Vector2f(150, 40));
+    sf::RectangleShape addEdgeButton(sf::Vector2f(175, 40));
     addEdgeButton.setPosition(sf::Vector2f(10, 205));
     addEdgeButton.setFillColor(sf::Color(40, 120, 40));
     addEdgeButton.setOutlineThickness(2);
     addEdgeButton.setOutlineColor(sf::Color::White);
-    sf::Text addEdgeText(font, "Add Edge", 18);
+    sf::Text addEdgeText(font, "Add Edge (E)", 18);
     addEdgeText.setFillColor(sf::Color::White);
     addEdgeText.setPosition(sf::Vector2f(20, 215));
 
     // Remove Edge button
-    sf::RectangleShape removeEdgeButton(sf::Vector2f(150, 40));
+    sf::RectangleShape removeEdgeButton(sf::Vector2f(175, 40));
     removeEdgeButton.setPosition(sf::Vector2f(10, 255));
     removeEdgeButton.setFillColor(sf::Color(200, 120, 40));
     removeEdgeButton.setOutlineThickness(2);
     removeEdgeButton.setOutlineColor(sf::Color::White);
-    sf::Text removeEdgeText(font, "Remove Edge", 18);
+    sf::Text removeEdgeText(font, "Remove Edge (X)", 18);
     removeEdgeText.setFillColor(sf::Color::White);
     removeEdgeText.setPosition(sf::Vector2f(20, 265));
 
@@ -185,6 +185,49 @@ int main()
             if (event->is<sf::Event::Closed>())
             {
                 window.close();
+            }
+            else if (event->is<sf::Event::KeyPressed>()) {
+                if (const auto* keyEvent = event->getIf<sf::Event::KeyPressed>()) {
+                    sf::Keyboard::Key key = keyEvent->code;
+                    switch (key) {
+                        case sf::Keyboard::Key::A:
+                            showTypeButtons = !showTypeButtons;
+                            currentMode = Mode::Idle;
+                            break;
+                        case sf::Keyboard::Key::D:
+                            if (showTypeButtons) {
+                                currentMode = Mode::AddNode;
+                                isDestinationNode = true;
+                                showTypeButtons = false;
+                            }
+                            break;
+                        case sf::Keyboard::Key::F:
+                            if (showTypeButtons) {
+                                currentMode = Mode::AddNode;
+                                isDestinationNode = false;
+                                showTypeButtons = false;
+                            }
+                            break;
+                        case sf::Keyboard::Key::R:
+                            currentMode = (currentMode == Mode::RemoveNode) ? Mode::Idle : Mode::RemoveNode;
+                            showTypeButtons = false;
+                            break;
+                        case sf::Keyboard::Key::E:
+                            currentMode = (currentMode == Mode::AddEdge) ? Mode::Idle : Mode::AddEdge;
+                            selectedNodeType = -1;
+                            selectedNodeIndex = -1;
+                            showTypeButtons = false;
+                            break;
+                        case sf::Keyboard::Key::X:
+                            currentMode = (currentMode == Mode::RemoveEdge) ? Mode::Idle : Mode::RemoveEdge;
+                            removeEdgeNodeType = -1;
+                            removeEdgeNodeIndex = -1;
+                            showTypeButtons = false;
+                            break;
+                        default:
+                            break;
+                    }
+                }
             }
             else if (event->is<sf::Event::MouseButtonPressed>())
             {
