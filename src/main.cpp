@@ -142,12 +142,12 @@ int main()
 {
     // Calculate scaled dimensions to fit 1920x1080 screen
     // Using 80% of screen height to leave some margin
-    // const float scale = 1.0f;
     const float scale = (1080.0f * 0.8f) / 1479.0f;
-    // const unsigned int windowWidth = static_cast<unsigned int>(809 * scale);
     const unsigned int windowWidth = static_cast<unsigned int>(1479 * scale);
-    // const unsigned int windowHeight = static_cast<unsigned int>(877 * scale);
     const unsigned int windowHeight = static_cast<unsigned int>(1479 * scale);
+    // const float scale = 1.0f;
+    // const unsigned int windowWidth = static_cast<unsigned int>(809 * scale);
+    // const unsigned int windowHeight = static_cast<unsigned int>(877 * scale);
 
     // Create window with scaled dimensions
     auto window = sf::RenderWindow(sf::VideoMode({windowWidth, windowHeight}), "Path Finder");
@@ -229,7 +229,7 @@ int main()
     removeText.setPosition(sf::Vector2f(205, 15));
 
     // Add Edge button
-    sf::RectangleShape addEdgeButton(sf::Vector2f(175, 40));
+    sf::RectangleShape addEdgeButton(sf::Vector2f(150, 40));
     addEdgeButton.setPosition(sf::Vector2f(380, 10));  // Moved horizontally
     addEdgeButton.setFillColor(sf::Color(40, 120, 40));
     addEdgeButton.setOutlineThickness(2);
@@ -240,13 +240,13 @@ int main()
 
     // Remove Edge button
     sf::RectangleShape removeEdgeButton(sf::Vector2f(175, 40));
-    removeEdgeButton.setPosition(sf::Vector2f(565, 10));  // Moved horizontally
+    removeEdgeButton.setPosition(sf::Vector2f(540, 10));  // Moved horizontally
     removeEdgeButton.setFillColor(sf::Color(200, 120, 40));
     removeEdgeButton.setOutlineThickness(2);
     removeEdgeButton.setOutlineColor(sf::Color::White);
     sf::Text removeEdgeText(font, "Remove Edge (X)", 18);
     removeEdgeText.setFillColor(sf::Color::White);
-    removeEdgeText.setPosition(sf::Vector2f(575, 15));
+    removeEdgeText.setPosition(sf::Vector2f(550, 15));
 
     // Mode message text - moved to the right of the buttons
     sf::Text modeText(font, "", 26);
@@ -298,14 +298,14 @@ int main()
     }
 
     // Add Find Path button
-    sf::RectangleShape findPathButton(sf::Vector2f(175, 40));
-    findPathButton.setPosition(sf::Vector2f(750, 10));
+    sf::RectangleShape findPathButton(sf::Vector2f(150, 40));
+    findPathButton.setPosition(sf::Vector2f(725, 10));
     findPathButton.setFillColor(sf::Color(80, 180, 80));
     findPathButton.setOutlineThickness(2);
     findPathButton.setOutlineColor(sf::Color::White);
     sf::Text findPathText(font, "Find Path (P)", 18);
     findPathText.setFillColor(sf::Color::White);
-    findPathText.setPosition(sf::Vector2f(760, 15));
+    findPathText.setPosition(sf::Vector2f(735, 15));
 
     while (window.isOpen())
     {
