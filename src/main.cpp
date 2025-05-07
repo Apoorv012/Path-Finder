@@ -70,6 +70,12 @@ int main()
     auto window = sf::RenderWindow(sf::VideoMode({windowWidth, windowHeight}), "Path Finder");
     window.setFramerateLimit(144);
 
+    // Set window icon
+    sf::Image icon;
+    if (icon.loadFromFile("path_finder_logo.png")) {
+        window.setIcon(icon);
+    }
+
     // Get the screen dimensions
     auto desktop = sf::VideoMode::getDesktopMode();
     
