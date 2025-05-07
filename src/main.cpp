@@ -4,10 +4,17 @@
 #include <iostream>
 #include <fstream>
 #include "json.hpp"
+#include <SFML/System/Angle.hpp>
 
 struct Node {
     sf::Vector2f position;
     bool isDestination;
+};
+
+// Edge structure
+struct Edge {
+    sf::Vector2f from;
+    sf::Vector2f to;
 };
 
 int main()
@@ -94,6 +101,16 @@ int main()
     removeText.setFillColor(sf::Color::White);
     removeText.setPosition(sf::Vector2f(20, 165));
 
+    // Add Edge button
+    sf::RectangleShape addEdgeButton(sf::Vector2f(150, 40));
+    addEdgeButton.setPosition(sf::Vector2f(10, 205));
+    addEdgeButton.setFillColor(sf::Color(40, 120, 40));
+    addEdgeButton.setOutlineThickness(2);
+    addEdgeButton.setOutlineColor(sf::Color::White);
+    sf::Text addEdgeText(font, "Add Edge", 18);
+    addEdgeText.setFillColor(sf::Color::White);
+    addEdgeText.setPosition(sf::Vector2f(20, 215));
+
     // Mode message text
     sf::Text modeText(font, "", 26);
     modeText.setFillColor(sf::Color::White);
@@ -104,6 +121,7 @@ int main()
     // Node vectors
     std::vector<Node> destinationNodes;
     std::vector<Node> roadNodes;
+    std::vector<Edge> edges;
 
     // Node selection state
     bool isAddingNode = false;
@@ -217,6 +235,42 @@ int main()
 
                     isAddingNode = false; // Reset the adding state
                 }
+                // Check if add edge button was clicked
+                else if (addEdgeButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
+                {
+                    edges.clear();
+                    // Connect each destination to its nearest road
+                    for (const auto& dest : destinationNodes) {
+                        float minDist = std::numeric_limits<float>::max();
+                        sf::Vector2f nearestRoad;
+                        for (const auto& road : roadNodes) {
+                            float dist = std::hypot(dest.position.x - road.position.x, dest.position.y - road.position.y);
+                            if (dist < minDist) {
+                                minDist = dist;
+                                nearestRoad = road.position;
+                            }
+                        }
+                        if (minDist < std::numeric_limits<float>::max()) {
+                            edges.push_back({dest.position, nearestRoad});
+                        }
+                    }
+                    // Connect each road to its nearest road (excluding itself)
+                    for (size_t i = 0; i < roadNodes.size(); ++i) {
+                        float minDist = std::numeric_limits<float>::max();
+                        sf::Vector2f nearestRoad;
+                        for (size_t j = 0; j < roadNodes.size(); ++j) {
+                            if (i == j) continue;
+                            float dist = std::hypot(roadNodes[i].position.x - roadNodes[j].position.x, roadNodes[i].position.y - roadNodes[j].position.y);
+                            if (dist < minDist) {
+                                minDist = dist;
+                                nearestRoad = roadNodes[j].position;
+                            }
+                        }
+                        if (minDist < std::numeric_limits<float>::max()) {
+                            edges.push_back({roadNodes[i].position, nearestRoad});
+                        }
+                    }
+                }
             }
         }
 
@@ -281,6 +335,18 @@ int main()
             window.draw(hoverShape);
         }
 
+        // Draw edges (thick lines)
+        for (const auto& edge : edges) {
+            sf::Vector2f diff = edge.to - edge.from;
+            float length = std::sqrt(diff.x * diff.x + diff.y * diff.y);
+            float angle = std::atan2(diff.y, diff.x) * 180 / 3.14159265f;
+            sf::RectangleShape thickLine(sf::Vector2f(length, 5)); // 5 pixels thick
+            thickLine.setPosition(edge.from);
+            thickLine.setFillColor(sf::Color::Yellow);
+            thickLine.setRotation(sf::degrees(angle));
+            window.draw(thickLine);
+        }
+
         // Draw button and text
         window.draw(button);
         window.draw(buttonText);
@@ -308,6 +374,9 @@ int main()
             modeText.setString("");
         }
         window.draw(modeText);
+        
+        window.draw(addEdgeButton);
+        window.draw(addEdgeText);
         
         window.display();
     }
