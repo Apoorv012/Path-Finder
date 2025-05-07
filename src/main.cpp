@@ -17,6 +17,14 @@ struct Edge {
     sf::Vector2f to;
 };
 
+enum class Mode {
+    Idle,
+    AddNode,
+    RemoveNode,
+    AddEdge,
+    RemoveEdge
+};
+
 int main()
 {
     // Calculate scaled dimensions to fit 1920x1080 screen
@@ -134,24 +142,17 @@ int main()
     std::vector<Edge> edges;
 
     // Node selection state
-    bool isAddingNode = false;
+    Mode currentMode = Mode::Idle;
     bool isDestinationNode = false;
     bool showTypeButtons = false;
-    bool isRemoveMode = false;
+    int selectedNodeType = -1; // 0: destination, 1: road
+    int selectedNodeIndex = -1;
+    int removeEdgeNodeType = -1;
+    int removeEdgeNodeIndex = -1;
 
     // For hover effect
     int hoveredNodeType = -1; // 0: destination, 1: road
     int hoveredNodeIndex = -1;
-
-    // Edge selection state
-    bool isAddEdgeMode = false;
-    int selectedNodeType = -1; // 0: destination, 1: road
-    int selectedNodeIndex = -1;
-
-    // Remove Edge state
-    bool isRemoveEdgeMode = false;
-    int removeEdgeNodeType = -1;
-    int removeEdgeNodeIndex = -1;
 
     // Load nodes from file
     {
@@ -192,105 +193,51 @@ int main()
                 // Check if button was clicked
                 if (button.getGlobalBounds().contains(sf::Vector2f(mousePos)))
                 {
-                    showTypeButtons = !showTypeButtons; // Toggle showTypeButtons
-                    isRemoveMode = false; // Turn off remove mode when Add Node is clicked
+                    showTypeButtons = !showTypeButtons;
+                    if (showTypeButtons) {
+                        currentMode = Mode::Idle;
+                    } else {
+                        currentMode = Mode::Idle;
+                    }
                 }
                 // Check if destination button was clicked
                 else if (showTypeButtons && destButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
                 {
-                    isAddingNode = true;
+                    currentMode = Mode::AddNode;
                     isDestinationNode = true;
                     showTypeButtons = false;
                 }
                 // Check if road button was clicked
                 else if (showTypeButtons && roadButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
                 {
-                    isAddingNode = true;
+                    currentMode = Mode::AddNode;
                     isDestinationNode = false;
                     showTypeButtons = false;
                 }
                 // Check if remove button was clicked
                 else if (removeButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
                 {
-                    isRemoveMode = !isRemoveMode; // Toggle remove mode
-                    showTypeButtons = false; // Hide type selection if remove is clicked
-                }
-                // If in remove mode, check if a node was clicked
-                else if (isRemoveMode)
-                {
-                    // Check destination nodes
-                    for (auto it = destinationNodes.begin(); it != destinationNodes.end(); ++it) {
-                        sf::CircleShape nodeShape(5);
-                        nodeShape.setPosition(it->position);
-                        if (nodeShape.getGlobalBounds().contains(window.mapPixelToCoords(mousePos))) {
-                            sf::Vector2f removedPos = it->position;
-                            destinationNodes.erase(it);
-                            // Remove all edges connected to this node
-                            edges.erase(std::remove_if(edges.begin(), edges.end(), [&](const Edge& e) {
-                                return e.from == removedPos || e.to == removedPos;
-                            }), edges.end());
-                            isRemoveMode = false;
-                            break;
-                        }
-                    }
-                    // Check road nodes if not already removed
-                    if (!isRemoveMode) continue;
-                    for (auto it = roadNodes.begin(); it != roadNodes.end(); ++it) {
-                        sf::CircleShape nodeShape(5);
-                        nodeShape.setPosition(it->position);
-                        if (nodeShape.getGlobalBounds().contains(window.mapPixelToCoords(mousePos))) {
-                            sf::Vector2f removedPos = it->position;
-                            roadNodes.erase(it);
-                            // Remove all edges connected to this node
-                            edges.erase(std::remove_if(edges.begin(), edges.end(), [&](const Edge& e) {
-                                return e.from == removedPos || e.to == removedPos;
-                            }), edges.end());
-                            isRemoveMode = false;
-                            break;
-                        }
-                    }
-                }
-                // If we're in node adding mode and clicked on the map
-                else if (isAddingNode && mousePos.x > 0 && mousePos.x < windowWidth &&
-                         mousePos.y > 0 && mousePos.y < windowHeight)
-                {
-                    // Convert mouse position to world coordinates
-                    sf::Vector2f worldPos = window.mapPixelToCoords(mousePos);
-                    
-                    // Create and add the node
-                    Node newNode;
-                    newNode.position = worldPos;
-                    newNode.isDestination = isDestinationNode;
-
-                    if (isDestinationNode) {
-                        destinationNodes.push_back(newNode);
-                    } else {
-                        roadNodes.push_back(newNode);
-                    }
-
-                    isAddingNode = false; // Reset the adding state
+                    currentMode = (currentMode == Mode::RemoveNode) ? Mode::Idle : Mode::RemoveNode;
+                    showTypeButtons = false;
                 }
                 // Check if add edge button was clicked
                 else if (addEdgeButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
                 {
-                    isAddEdgeMode = !isAddEdgeMode;
+                    currentMode = (currentMode == Mode::AddEdge) ? Mode::Idle : Mode::AddEdge;
                     selectedNodeType = -1;
                     selectedNodeIndex = -1;
-                    isRemoveMode = false;
                     showTypeButtons = false;
                 }
                 // Check if remove edge button was clicked
                 else if (removeEdgeButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
                 {
-                    isRemoveEdgeMode = !isRemoveEdgeMode;
+                    currentMode = (currentMode == Mode::RemoveEdge) ? Mode::Idle : Mode::RemoveEdge;
                     removeEdgeNodeType = -1;
                     removeEdgeNodeIndex = -1;
-                    isAddEdgeMode = false;
-                    isRemoveMode = false;
                     showTypeButtons = false;
                 }
                 // Manual edge adding mode
-                else if (isAddEdgeMode && (hoveredNodeType != -1 && hoveredNodeIndex != -1))
+                else if (currentMode == Mode::AddEdge && (hoveredNodeType != -1 && hoveredNodeIndex != -1))
                 {
                     if (selectedNodeType == -1) {
                         // First node selected
@@ -311,11 +258,11 @@ int main()
                         // Reset selection for next edge
                         selectedNodeType = -1;
                         selectedNodeIndex = -1;
-                        isAddEdgeMode = false;
+                        currentMode = Mode::Idle;
                     }
                 }
                 // Manual edge removal mode
-                else if (isRemoveEdgeMode && (hoveredNodeType != -1 && hoveredNodeIndex != -1))
+                else if (currentMode == Mode::RemoveEdge && (hoveredNodeType != -1 && hoveredNodeIndex != -1))
                 {
                     if (removeEdgeNodeType == -1) {
                         // First node selected
@@ -342,8 +289,60 @@ int main()
                         // Reset selection for next removal
                         removeEdgeNodeType = -1;
                         removeEdgeNodeIndex = -1;
-                        isRemoveEdgeMode = false;
+                        currentMode = Mode::Idle;
                     }
+                }
+                // Remove node mode
+                else if (currentMode == Mode::RemoveNode)
+                {
+                    // Check destination nodes
+                    for (auto it = destinationNodes.begin(); it != destinationNodes.end(); ++it) {
+                        sf::CircleShape nodeShape(5);
+                        nodeShape.setPosition(it->position);
+                        if (nodeShape.getGlobalBounds().contains(window.mapPixelToCoords(mousePos))) {
+                            sf::Vector2f removedPos = it->position;
+                            destinationNodes.erase(it);
+                            // Remove all edges connected to this node
+                            edges.erase(std::remove_if(edges.begin(), edges.end(), [&](const Edge& e) {
+                                return e.from == removedPos || e.to == removedPos;
+                            }), edges.end());
+                            currentMode = Mode::Idle;
+                            break;
+                        }
+                    }
+                    // Check road nodes if not already removed
+                    if (currentMode != Mode::RemoveNode) continue;
+                    for (auto it = roadNodes.begin(); it != roadNodes.end(); ++it) {
+                        sf::CircleShape nodeShape(5);
+                        nodeShape.setPosition(it->position);
+                        if (nodeShape.getGlobalBounds().contains(window.mapPixelToCoords(mousePos))) {
+                            sf::Vector2f removedPos = it->position;
+                            roadNodes.erase(it);
+                            // Remove all edges connected to this node
+                            edges.erase(std::remove_if(edges.begin(), edges.end(), [&](const Edge& e) {
+                                return e.from == removedPos || e.to == removedPos;
+                            }), edges.end());
+                            currentMode = Mode::Idle;
+                            break;
+                        }
+                    }
+                }
+                // Add node mode
+                else if (currentMode == Mode::AddNode && mousePos.x > 0 && mousePos.x < windowWidth &&
+                         mousePos.y > 0 && mousePos.y < windowHeight)
+                {
+                    // Convert mouse position to world coordinates
+                    sf::Vector2f worldPos = window.mapPixelToCoords(mousePos);
+                    // Create and add the node
+                    Node newNode;
+                    newNode.position = worldPos;
+                    newNode.isDestination = isDestinationNode;
+                    if (isDestinationNode) {
+                        destinationNodes.push_back(newNode);
+                    } else {
+                        roadNodes.push_back(newNode);
+                    }
+                    currentMode = Mode::Idle;
                 }
             }
         }
@@ -422,7 +421,7 @@ int main()
         }
 
         // Draw selection highlight for manual edge
-        if (isAddEdgeMode && selectedNodeType != -1 && selectedNodeIndex != -1) {
+        if (currentMode == Mode::AddEdge && selectedNodeType != -1 && selectedNodeIndex != -1) {
             sf::Vector2f pos = (selectedNodeType == 0) ? destinationNodes[selectedNodeIndex].position : roadNodes[selectedNodeIndex].position;
             sf::CircleShape selShape(10);
             selShape.setPosition(pos - sf::Vector2f(5, 5));
@@ -432,7 +431,7 @@ int main()
             window.draw(selShape);
         }
         // Draw selection highlight for manual edge removal
-        if (isRemoveEdgeMode && removeEdgeNodeType != -1 && removeEdgeNodeIndex != -1) {
+        if (currentMode == Mode::RemoveEdge && removeEdgeNodeType != -1 && removeEdgeNodeIndex != -1) {
             sf::Vector2f pos = (removeEdgeNodeType == 0) ? destinationNodes[removeEdgeNodeIndex].position : roadNodes[removeEdgeNodeIndex].position;
             sf::CircleShape selShape(10);
             selShape.setPosition(pos - sf::Vector2f(5, 5));
@@ -457,28 +456,35 @@ int main()
         window.draw(removeEdgeText);
 
         // Set and draw mode message
-        if (isRemoveMode) {
-            modeText.setString("Remove node");
-        } else if (isRemoveEdgeMode) {
-            if (removeEdgeNodeType == -1)
-                modeText.setString("Select first node (remove edge)");
-            else
-                modeText.setString("Select second node (remove edge)");
-        } else if (isAddEdgeMode) {
-            if (selectedNodeType == -1)
-                modeText.setString("Select first node");
-            else
-                modeText.setString("Select second node");
-        } else if (isAddingNode) {
-            if (isDestinationNode) {
-                modeText.setString("Add destination");
-            } else {
-                modeText.setString("Add road");
-            }
-        } else if (showTypeButtons) {
-            modeText.setString("Node type");
-        } else {
-            modeText.setString("");
+        switch (currentMode) {
+            case Mode::RemoveNode:
+                modeText.setString("Remove node");
+                break;
+            case Mode::RemoveEdge:
+                if (removeEdgeNodeType == -1)
+                    modeText.setString("Select first node (remove edge)");
+                else
+                    modeText.setString("Select second node (remove edge)");
+                break;
+            case Mode::AddEdge:
+                if (selectedNodeType == -1)
+                    modeText.setString("Select first node (add edge)");
+                else
+                    modeText.setString("Select second node (add edge)");
+                break;
+            case Mode::AddNode:
+                if (isDestinationNode)
+                    modeText.setString("Add destination");
+                else
+                    modeText.setString("Add road");
+                break;
+            case Mode::Idle:
+            default:
+                if (showTypeButtons)
+                    modeText.setString("Node type");
+                else
+                    modeText.setString("");
+                break;
         }
         window.draw(modeText);
         
