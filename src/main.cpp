@@ -2,6 +2,8 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <fstream>
+#include "json.hpp"
 
 struct Node {
     sf::Vector2f position;
@@ -112,6 +114,25 @@ int main()
     // For hover effect
     int hoveredNodeType = -1; // 0: destination, 1: road
     int hoveredNodeIndex = -1;
+
+    // Load nodes from file
+    {
+        std::ifstream inFile("nodes.json");
+        if (inFile) {
+            nlohmann::json j;
+            inFile >> j;
+            if (j.contains("destinations")) {
+                for (const auto& node : j["destinations"]) {
+                    destinationNodes.push_back(Node{sf::Vector2f(node[0], node[1]), true});
+                }
+            }
+            if (j.contains("roads")) {
+                for (const auto& node : j["roads"]) {
+                    roadNodes.push_back(Node{sf::Vector2f(node[0], node[1]), false});
+                }
+            }
+        }
+    }
 
     while (window.isOpen())
     {
@@ -290,4 +311,21 @@ int main()
         
         window.display();
     }
+
+    // At the end of main, before return 0 or closing brace
+    {
+        nlohmann::json j;
+        j["destinations"] = nlohmann::json::array();
+        for (const auto& node : destinationNodes) {
+            j["destinations"].push_back({node.position.x, node.position.y});
+        }
+        j["roads"] = nlohmann::json::array();
+        for (const auto& node : roadNodes) {
+            j["roads"].push_back({node.position.x, node.position.y});
+        }
+        std::ofstream outFile("nodes.json");
+        outFile << j.dump(4);
+    }
+
+    return 0;
 }
