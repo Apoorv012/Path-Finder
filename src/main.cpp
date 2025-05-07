@@ -5,6 +5,23 @@
 #include <fstream>
 #include "json.hpp"
 #include <SFML/System/Angle.hpp>
+#include <queue>
+#include <unordered_map>
+#include <limits>
+#include <cmath>
+
+// Hash function for sf::Vector2f
+namespace std {
+    template<>
+    struct hash<sf::Vector2f> {
+        size_t operator()(const sf::Vector2f& v) const {
+            // Combine hashes of x and y components
+            size_t h1 = hash<float>()(v.x);
+            size_t h2 = hash<float>()(v.y);
+            return h1 ^ (h2 << 1);
+        }
+    };
+}
 
 struct Node {
     sf::Vector2f position;
@@ -22,7 +39,8 @@ enum class Mode {
     AddNode,
     RemoveNode,
     AddEdge,
-    RemoveEdge
+    RemoveEdge,
+    FindPath
 };
 
 // Add this function before main()
@@ -53,6 +71,71 @@ void centerText(sf::Text& text, unsigned int windowWidth, unsigned int yOffset) 
 
     text.setOrigin(sf::Vector2f(pos.x + size.x / 2.0f, pos.y + size.y / 2.0f));
     text.setPosition(sf::Vector2f(windowWidth / 2.0f, yOffset));
+}
+
+int findPathNode1 = -1, findPathNode2 = -1;
+std::vector<sf::Vector2f> foundPath;
+
+float euclidean(const sf::Vector2f& a, const sf::Vector2f& b) {
+    float dx = a.x - b.x, dy = a.y - b.y;
+    return std::sqrt(dx*dx + dy*dy);
+}
+
+std::vector<sf::Vector2f> findShortestPath(
+    const sf::Vector2f& start,
+    const sf::Vector2f& goal,
+    const std::vector<Node>& destinationNodes,
+    const std::vector<Node>& roadNodes,
+    const std::vector<Edge>& edges
+) {
+    // Build adjacency list
+    std::vector<sf::Vector2f> allNodes;
+    for (const auto& n : destinationNodes) allNodes.push_back(n.position);
+    for (const auto& n : roadNodes) allNodes.push_back(n.position);
+
+    std::unordered_map<sf::Vector2f, std::vector<sf::Vector2f>> adj;
+    for (const auto& node : allNodes) adj[node] = {};
+    for (const auto& e : edges) {
+        adj[e.from].push_back(e.to);
+        adj[e.to].push_back(e.from);
+    }
+
+    // Dijkstra
+    std::unordered_map<sf::Vector2f, float> dist;
+    std::unordered_map<sf::Vector2f, sf::Vector2f> prev;
+    auto vec_hash = [](const sf::Vector2f& v) {
+        return std::hash<float>()(v.x) ^ std::hash<float>()(v.y);
+    };
+    auto cmp = [&](const sf::Vector2f& a, const sf::Vector2f& b) {
+        return dist[a] > dist[b];
+    };
+    std::priority_queue<sf::Vector2f, std::vector<sf::Vector2f>, decltype(cmp)> pq(cmp);
+
+    for (const auto& node : allNodes) dist[node] = std::numeric_limits<float>::infinity();
+    dist[start] = 0;
+    pq.push(start);
+
+    while (!pq.empty()) {
+        sf::Vector2f u = pq.top(); pq.pop();
+        if (u == goal) break;
+        for (const auto& v : adj[u]) {
+            float alt = dist[u] + euclidean(u, v);
+            if (alt < dist[v]) {
+                dist[v] = alt;
+                prev[v] = u;
+                pq.push(v);
+            }
+        }
+    }
+
+    // Reconstruct path
+    std::vector<sf::Vector2f> path;
+    if (prev.find(goal) == prev.end()) return path; // No path
+    for (sf::Vector2f at = goal; at != start; at = prev[at])
+        path.push_back(at);
+    path.push_back(start);
+    std::reverse(path.begin(), path.end());
+    return path;
 }
 
 int main()
@@ -214,6 +297,16 @@ int main()
         }
     }
 
+    // Add Find Path button
+    sf::RectangleShape findPathButton(sf::Vector2f(175, 40));
+    findPathButton.setPosition(sf::Vector2f(750, 10));
+    findPathButton.setFillColor(sf::Color(80, 180, 80));
+    findPathButton.setOutlineThickness(2);
+    findPathButton.setOutlineColor(sf::Color::White);
+    sf::Text findPathText(font, "Find Path (P)", 18);
+    findPathText.setFillColor(sf::Color::White);
+    findPathText.setPosition(sf::Vector2f(760, 15));
+
     while (window.isOpen())
     {
         while (const std::optional event = window.pollEvent())
@@ -233,12 +326,14 @@ int main()
                         case sf::Keyboard::Key::A:
                             showTypeButtons = !showTypeButtons;
                             currentMode = Mode::Idle;
+                            foundPath.clear();
                             break;
                         case sf::Keyboard::Key::D:
                             if (showTypeButtons) {
                                 currentMode = Mode::AddNode;
                                 isDestinationNode = true;
                                 showTypeButtons = false;
+                                foundPath.clear();
                             }
                             break;
                         case sf::Keyboard::Key::F:
@@ -246,23 +341,34 @@ int main()
                                 currentMode = Mode::AddNode;
                                 isDestinationNode = false;
                                 showTypeButtons = false;
+                                foundPath.clear();
                             }
                             break;
                         case sf::Keyboard::Key::R:
                             currentMode = (currentMode == Mode::RemoveNode) ? Mode::Idle : Mode::RemoveNode;
                             showTypeButtons = false;
+                            foundPath.clear();
                             break;
                         case sf::Keyboard::Key::E:
                             currentMode = (currentMode == Mode::AddEdge) ? Mode::Idle : Mode::AddEdge;
                             selectedNodeType = -1;
                             selectedNodeIndex = -1;
                             showTypeButtons = false;
+                            foundPath.clear();
                             break;
                         case sf::Keyboard::Key::X:
                             currentMode = (currentMode == Mode::RemoveEdge) ? Mode::Idle : Mode::RemoveEdge;
                             removeEdgeNodeType = -1;
                             removeEdgeNodeIndex = -1;
                             showTypeButtons = false;
+                            foundPath.clear();
+                            break;
+                        case sf::Keyboard::Key::P:
+                            currentMode = (currentMode == Mode::FindPath) ? Mode::Idle : Mode::FindPath;
+                            findPathNode1 = -1;
+                            findPathNode2 = -1;
+                            showTypeButtons = false;
+                            foundPath.clear();
                             break;
                         default:
                             break;
@@ -277,6 +383,7 @@ int main()
                 if (button.getGlobalBounds().contains(sf::Vector2f(mousePos)))
                 {
                     showTypeButtons = !showTypeButtons;
+                    foundPath.clear();
                     if (showTypeButtons) {
                         currentMode = Mode::Idle;
                     } else {
@@ -289,6 +396,7 @@ int main()
                     currentMode = Mode::AddNode;
                     isDestinationNode = true;
                     showTypeButtons = false;
+                    foundPath.clear();
                 }
                 // Check if road button was clicked
                 else if (showTypeButtons && roadButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
@@ -296,6 +404,7 @@ int main()
                     currentMode = Mode::AddNode;
                     isDestinationNode = false;
                     showTypeButtons = false;
+                    foundPath.clear();
                 }
                 // Check if remove button was clicked
                 else if (removeButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
@@ -310,6 +419,7 @@ int main()
                     selectedNodeType = -1;
                     selectedNodeIndex = -1;
                     showTypeButtons = false;
+                    foundPath.clear();
                 }
                 // Check if remove edge button was clicked
                 else if (removeEdgeButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
@@ -318,6 +428,16 @@ int main()
                     removeEdgeNodeType = -1;
                     removeEdgeNodeIndex = -1;
                     showTypeButtons = false;
+                    foundPath.clear();
+                }
+                // Check if find path button was clicked
+                else if (findPathButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
+                {
+                    currentMode = (currentMode == Mode::FindPath) ? Mode::Idle : Mode::FindPath;
+                    findPathNode1 = -1;
+                    findPathNode2 = -1;
+                    showTypeButtons = false;
+                    foundPath.clear();
                 }
                 // Manual edge adding mode
                 else if (currentMode == Mode::AddEdge && (hoveredNodeType != -1 && hoveredNodeIndex != -1))
@@ -427,6 +547,24 @@ int main()
                     }
                     currentMode = Mode::Idle;
                 }
+                // Find path mode
+                else if (currentMode == Mode::FindPath && hoveredNodeType == 0 && hoveredNodeIndex != -1)
+                {
+                    if (findPathNode1 == -1) {
+                        findPathNode1 = hoveredNodeIndex;
+                    } else if (findPathNode2 == -1 && hoveredNodeIndex != findPathNode1) {
+                        findPathNode2 = hoveredNodeIndex;
+                        // Run pathfinding here!
+                        foundPath = findShortestPath(
+                            destinationNodes[findPathNode1].position,
+                            destinationNodes[findPathNode2].position,
+                            destinationNodes, roadNodes, edges
+                        );
+                        currentMode = Mode::Idle;
+                        findPathNode1 = -1;
+                        findPathNode2 = -1;
+                    }
+                }
             }
         }
 
@@ -525,6 +663,17 @@ int main()
             window.draw(selShape);
         }
 
+        // Draw selection highlight for find path
+        if (currentMode == Mode::FindPath && findPathNode1 != -1) {
+            sf::Vector2f pos = destinationNodes[findPathNode1].position;
+            sf::CircleShape selShape(10);
+            selShape.setPosition(pos - sf::Vector2f(5, 5));
+            selShape.setFillColor(sf::Color::Transparent);
+            selShape.setOutlineColor(sf::Color::Green);
+            selShape.setOutlineThickness(3);
+            window.draw(selShape);
+        }
+
         // Draw button and text
         window.draw(button);
         window.draw(buttonText);
@@ -562,6 +711,14 @@ int main()
                 else
                     modeText.setString("Add road");
                 break;
+            case Mode::FindPath:
+                if (findPathNode1 == -1)
+                    modeText.setString("Select first node (find path)");
+                else if (findPathNode2 == -1)
+                    modeText.setString("Select second node (find path)");
+                else
+                    modeText.setString("Shortest path");
+                break;
             case Mode::Idle:
             default:
                 if (showTypeButtons)
@@ -575,6 +732,23 @@ int main()
         
         window.draw(addEdgeButton);
         window.draw(addEdgeText);
+        
+        window.draw(findPathButton);
+        window.draw(findPathText);
+        
+        if (!foundPath.empty()) {
+            for (size_t i = 1; i < foundPath.size(); ++i) {
+                sf::Vector2f from = foundPath[i-1], to = foundPath[i];
+                sf::Vector2f diff = to - from;
+                float length = std::sqrt(diff.x * diff.x + diff.y * diff.y);
+                float angle = std::atan2(diff.y, diff.x) * 180 / 3.14159265f;
+                sf::RectangleShape thickLine(sf::Vector2f(length, 7)); // 7 pixels thick
+                thickLine.setPosition(from);
+                thickLine.setFillColor(sf::Color::Green);
+                thickLine.setRotation(sf::degrees(angle));
+                window.draw(thickLine);
+            }
+        }
         
         window.display();
     }
