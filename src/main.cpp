@@ -88,6 +88,13 @@ int main()
     removeText.setFillColor(sf::Color::White);
     removeText.setPosition(sf::Vector2f(20, 165));
 
+    // Mode message text
+    sf::Text modeText(font, "", 26);
+    modeText.setFillColor(sf::Color::White);
+    modeText.setOutlineColor(sf::Color::Black);
+    modeText.setOutlineThickness(2);
+    modeText.setPosition(sf::Vector2f(180, 15));
+
     // Node vectors
     std::vector<Node> destinationNodes;
     std::vector<Node> roadNodes;
@@ -97,6 +104,10 @@ int main()
     bool isDestinationNode = false;
     bool showTypeButtons = false;
     bool isRemoveMode = false;
+
+    // For hover effect
+    int hoveredNodeType = -1; // 0: destination, 1: road
+    int hoveredNodeIndex = -1;
 
     while (window.isOpen())
     {
@@ -113,7 +124,8 @@ int main()
                 // Check if button was clicked
                 if (button.getGlobalBounds().contains(sf::Vector2f(mousePos)))
                 {
-                    showTypeButtons = true;
+                    showTypeButtons = !showTypeButtons; // Toggle showTypeButtons
+                    isRemoveMode = false; // Turn off remove mode when Add Node is clicked
                 }
                 // Check if destination button was clicked
                 else if (showTypeButtons && destButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
@@ -133,6 +145,7 @@ int main()
                 else if (removeButton.getGlobalBounds().contains(sf::Vector2f(mousePos)))
                 {
                     isRemoveMode = !isRemoveMode; // Toggle remove mode
+                    showTypeButtons = false; // Hide type selection if remove is clicked
                 }
                 // If in remove mode, check if a node was clicked
                 else if (isRemoveMode)
@@ -185,6 +198,34 @@ int main()
         window.clear();
         window.draw(mapSprite); // Draw the map
         
+        // --- HOVER LOGIC ---
+        hoveredNodeType = -1;
+        hoveredNodeIndex = -1;
+        sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+        sf::Vector2f mouseWorld = window.mapPixelToCoords(mousePos);
+        // Check destination nodes
+        for (size_t i = 0; i < destinationNodes.size(); ++i) {
+            sf::CircleShape nodeShape(5);
+            nodeShape.setPosition(destinationNodes[i].position);
+            if (nodeShape.getGlobalBounds().contains(mouseWorld)) {
+                hoveredNodeType = 0;
+                hoveredNodeIndex = i;
+                break;
+            }
+        }
+        // Check road nodes if not already hovering
+        if (hoveredNodeType == -1) {
+            for (size_t i = 0; i < roadNodes.size(); ++i) {
+                sf::CircleShape nodeShape(5);
+                nodeShape.setPosition(roadNodes[i].position);
+                if (nodeShape.getGlobalBounds().contains(mouseWorld)) {
+                    hoveredNodeType = 1;
+                    hoveredNodeIndex = i;
+                    break;
+                }
+            }
+        }
+
         // Draw nodes
         for (const auto& node : destinationNodes) {
             sf::CircleShape nodeShape(5);
@@ -200,6 +241,21 @@ int main()
             window.draw(nodeShape);
         }
 
+        // Draw hover effect
+        if (hoveredNodeType != -1 && hoveredNodeIndex != -1) {
+            sf::CircleShape hoverShape(8);
+            if (hoveredNodeType == 0) {
+                hoverShape.setPosition(destinationNodes[hoveredNodeIndex].position - sf::Vector2f(3, 3));
+                hoverShape.setOutlineColor(sf::Color::Red);
+            } else {
+                hoverShape.setPosition(roadNodes[hoveredNodeIndex].position - sf::Vector2f(3, 3));
+                hoverShape.setOutlineColor(sf::Color::Blue);
+            }
+            hoverShape.setFillColor(sf::Color::Transparent);
+            hoverShape.setOutlineThickness(3);
+            window.draw(hoverShape);
+        }
+
         // Draw button and text
         window.draw(button);
         window.draw(buttonText);
@@ -211,11 +267,22 @@ int main()
         }
         window.draw(removeButton);
         window.draw(removeText);
-        
-        // Optionally, visually indicate remove mode
+
+        // Set and draw mode message
         if (isRemoveMode) {
-            // Draw a red outline around the window or show a message
+            modeText.setString("Remove node");
+        } else if (isAddingNode) {
+            if (isDestinationNode) {
+                modeText.setString("Add destination");
+            } else {
+                modeText.setString("Add road");
+            }
+        } else if (showTypeButtons) {
+            modeText.setString("Node type");
+        } else {
+            modeText.setString("");
         }
+        window.draw(modeText);
         
         window.display();
     }
