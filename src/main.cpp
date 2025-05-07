@@ -25,6 +25,27 @@ enum class Mode {
     RemoveEdge
 };
 
+// Add this function before main()
+void saveToFile(const std::vector<Node>& destinationNodes, 
+                const std::vector<Node>& roadNodes, 
+                const std::vector<Edge>& edges) {
+    nlohmann::json j;
+    j["destinations"] = nlohmann::json::array();
+    for (const auto& node : destinationNodes) {
+        j["destinations"].push_back({node.position.x, node.position.y});
+    }
+    j["roads"] = nlohmann::json::array();
+    for (const auto& node : roadNodes) {
+        j["roads"].push_back({node.position.x, node.position.y});
+    }
+    j["edges"] = nlohmann::json::array();
+    for (const auto& edge : edges) {
+        j["edges"].push_back({{edge.from.x, edge.from.y}, {edge.to.x, edge.to.y}});
+    }
+    std::ofstream outFile("nodes.json");
+    outFile << j.dump(4);
+}
+
 int main()
 {
     // Calculate scaled dimensions to fit 1920x1080 screen
@@ -182,9 +203,13 @@ int main()
     {
         while (const std::optional event = window.pollEvent())
         {
-            if (event->is<sf::Event::Closed>())
+            if (event->is<sf::Event::Closed>() || 
+                (event->is<sf::Event::KeyPressed>() && 
+                 event->getIf<sf::Event::KeyPressed>()->code == sf::Keyboard::Key::Escape))
             {
+                saveToFile(destinationNodes, roadNodes, edges);
                 window.close();
+                return 0;
             }
             else if (event->is<sf::Event::KeyPressed>()) {
                 if (const auto* keyEvent = event->getIf<sf::Event::KeyPressed>()) {
@@ -537,24 +562,7 @@ int main()
         window.display();
     }
 
-    // At the end of main, before return 0 or closing brace
-    {
-        nlohmann::json j;
-        j["destinations"] = nlohmann::json::array();
-        for (const auto& node : destinationNodes) {
-            j["destinations"].push_back({node.position.x, node.position.y});
-        }
-        j["roads"] = nlohmann::json::array();
-        for (const auto& node : roadNodes) {
-            j["roads"].push_back({node.position.x, node.position.y});
-        }
-        j["edges"] = nlohmann::json::array();
-        for (const auto& edge : edges) {
-            j["edges"].push_back({{edge.from.x, edge.from.y}, {edge.to.x, edge.to.y}});
-        }
-        std::ofstream outFile("nodes.json");
-        outFile << j.dump(4);
-    }
-
+    // Save before normal program end
+    saveToFile(destinationNodes, roadNodes, edges);
     return 0;
 }
