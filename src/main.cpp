@@ -12,8 +12,11 @@ int main()
 {
     // Calculate scaled dimensions to fit 1920x1080 screen
     // Using 80% of screen height to leave some margin
+    // const float scale = 1.0f;
     const float scale = (1080.0f * 0.8f) / 1479.0f;
+    // const unsigned int windowWidth = static_cast<unsigned int>(809 * scale);
     const unsigned int windowWidth = static_cast<unsigned int>(1479 * scale);
+    // const unsigned int windowHeight = static_cast<unsigned int>(877 * scale);
     const unsigned int windowHeight = static_cast<unsigned int>(1479 * scale);
 
     // Create window with scaled dimensions
@@ -32,6 +35,7 @@ int main()
 
     // Load the map texture
     sf::Texture mapTexture;
+    // if (!mapTexture.loadFromFile("map2.jpg"))
     if (!mapTexture.loadFromFile("map.png"))
     {
         return -1; // Exit if image loading fails
