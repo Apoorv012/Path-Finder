@@ -46,6 +46,15 @@ void saveToFile(const std::vector<Node>& destinationNodes,
     outFile << j.dump(4);
 }
 
+void centerText(sf::Text& text, unsigned int windowWidth, unsigned int yOffset) {
+    sf::FloatRect textBounds = text.getLocalBounds();
+    sf::Vector2f pos = textBounds.position;
+    sf::Vector2f size = textBounds.size;
+
+    text.setOrigin(sf::Vector2f(pos.x + size.x / 2.0f, pos.y + size.y / 2.0f));
+    text.setPosition(sf::Vector2f(windowWidth / 2.0f, yOffset));
+}
+
 int main()
 {
     // Calculate scaled dimensions to fit 1920x1080 screen
@@ -85,14 +94,14 @@ int main()
     // Scale the sprite to fit the window
     mapSprite.setScale(sf::Vector2f(scale, scale));
 
-    // Create button
+    // Create button (Add Node)
     sf::RectangleShape button(sf::Vector2f(175, 40));
     button.setPosition(sf::Vector2f(10, 10));
     button.setFillColor(sf::Color(100, 100, 100));
     button.setOutlineThickness(2);
     button.setOutlineColor(sf::Color::White);
 
-    // Create button text
+    // Create button text (Add Node)
     sf::Font font;
     if (!font.openFromFile("OpenSans-Regular.ttf")) {
         return -1; // Exit if font loading fails
@@ -103,7 +112,7 @@ int main()
 
     // Node type selection buttons (hidden by default)
     sf::RectangleShape destButton(sf::Vector2f(155, 35));
-    destButton.setPosition(sf::Vector2f(20, 60));
+    destButton.setPosition(sf::Vector2f(20, 60));  // Keep under Add Node
     destButton.setFillColor(sf::Color(200, 80, 80));
     destButton.setOutlineThickness(2);
     destButton.setOutlineColor(sf::Color::White);
@@ -112,7 +121,7 @@ int main()
     destText.setPosition(sf::Vector2f(30, 65));
 
     sf::RectangleShape roadButton(sf::Vector2f(155, 35));
-    roadButton.setPosition(sf::Vector2f(20, 105));
+    roadButton.setPosition(sf::Vector2f(20, 105));  // Keep under Add Node
     roadButton.setFillColor(sf::Color(80, 80, 200));
     roadButton.setOutlineThickness(2);
     roadButton.setOutlineColor(sf::Color::White);
@@ -122,40 +131,40 @@ int main()
 
     // Remove Node button
     sf::RectangleShape removeButton(sf::Vector2f(175, 40));
-    removeButton.setPosition(sf::Vector2f(10, 155));
+    removeButton.setPosition(sf::Vector2f(195, 10));  // Moved horizontally
     removeButton.setFillColor(sf::Color(120, 40, 40));
     removeButton.setOutlineThickness(2);
     removeButton.setOutlineColor(sf::Color::White);
     sf::Text removeText(font, "Remove Node (R)", 18);
     removeText.setFillColor(sf::Color::White);
-    removeText.setPosition(sf::Vector2f(20, 165));
+    removeText.setPosition(sf::Vector2f(205, 15));
 
     // Add Edge button
     sf::RectangleShape addEdgeButton(sf::Vector2f(175, 40));
-    addEdgeButton.setPosition(sf::Vector2f(10, 205));
+    addEdgeButton.setPosition(sf::Vector2f(380, 10));  // Moved horizontally
     addEdgeButton.setFillColor(sf::Color(40, 120, 40));
     addEdgeButton.setOutlineThickness(2);
     addEdgeButton.setOutlineColor(sf::Color::White);
     sf::Text addEdgeText(font, "Add Edge (E)", 18);
     addEdgeText.setFillColor(sf::Color::White);
-    addEdgeText.setPosition(sf::Vector2f(20, 215));
+    addEdgeText.setPosition(sf::Vector2f(390, 15));
 
     // Remove Edge button
     sf::RectangleShape removeEdgeButton(sf::Vector2f(175, 40));
-    removeEdgeButton.setPosition(sf::Vector2f(10, 255));
+    removeEdgeButton.setPosition(sf::Vector2f(565, 10));  // Moved horizontally
     removeEdgeButton.setFillColor(sf::Color(200, 120, 40));
     removeEdgeButton.setOutlineThickness(2);
     removeEdgeButton.setOutlineColor(sf::Color::White);
     sf::Text removeEdgeText(font, "Remove Edge (X)", 18);
     removeEdgeText.setFillColor(sf::Color::White);
-    removeEdgeText.setPosition(sf::Vector2f(20, 265));
+    removeEdgeText.setPosition(sf::Vector2f(575, 15));
 
-    // Mode message text
+    // Mode message text - moved to the right of the buttons
     sf::Text modeText(font, "", 26);
     modeText.setFillColor(sf::Color::White);
     modeText.setOutlineColor(sf::Color::Black);
     modeText.setOutlineThickness(2);
-    modeText.setPosition(sf::Vector2f(180, 15));
+    modeText.setPosition(sf::Vector2f(300, 65));
 
     // Node vectors
     std::vector<Node> destinationNodes;
@@ -417,6 +426,18 @@ int main()
 
         window.clear();
         window.draw(mapSprite); // Draw the map
+
+        // Draw edges (thick lines)
+        for (const auto& edge : edges) {
+            sf::Vector2f diff = edge.to - edge.from;
+            float length = std::sqrt(diff.x * diff.x + diff.y * diff.y);
+            float angle = std::atan2(diff.y, diff.x) * 180 / 3.14159265f;
+            sf::RectangleShape thickLine(sf::Vector2f(length, 5)); // 5 pixels thick
+            thickLine.setPosition(edge.from);
+            thickLine.setFillColor(sf::Color::Yellow);
+            thickLine.setRotation(sf::degrees(angle));
+            window.draw(thickLine);
+        }
         
         // --- HOVER LOGIC ---
         hoveredNodeType = -1;
@@ -433,6 +454,7 @@ int main()
                 break;
             }
         }
+
         // Check road nodes if not already hovering
         if (hoveredNodeType == -1) {
             for (size_t i = 0; i < roadNodes.size(); ++i) {
@@ -474,18 +496,6 @@ int main()
             hoverShape.setFillColor(sf::Color::Transparent);
             hoverShape.setOutlineThickness(3);
             window.draw(hoverShape);
-        }
-
-        // Draw edges (thick lines)
-        for (const auto& edge : edges) {
-            sf::Vector2f diff = edge.to - edge.from;
-            float length = std::sqrt(diff.x * diff.x + diff.y * diff.y);
-            float angle = std::atan2(diff.y, diff.x) * 180 / 3.14159265f;
-            sf::RectangleShape thickLine(sf::Vector2f(length, 5)); // 5 pixels thick
-            thickLine.setPosition(edge.from);
-            thickLine.setFillColor(sf::Color::Yellow);
-            thickLine.setRotation(sf::degrees(angle));
-            window.draw(thickLine);
         }
 
         // Draw selection highlight for manual edge
@@ -554,6 +564,7 @@ int main()
                     modeText.setString("");
                 break;
         }
+        centerText(modeText, windowWidth, 80);
         window.draw(modeText);
         
         window.draw(addEdgeButton);
